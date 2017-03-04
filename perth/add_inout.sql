@@ -3,7 +3,6 @@
 set search_path to mimiciii;
 
 SELECT
-  COUNT(*),
   pvt.subject_id
 , pvt.hadm_id
 , pvt.icustay_id
@@ -184,4 +183,4 @@ JOIN mimiciii.icustays ie ON pvt.icustay_id = ie.icustay_id
 JOIN mimiciii.inputevents_cv iec ON pvt.icustay_id = iec.icustay_id
 group by pvt.subject_id, pvt.hadm_id, pvt.icustay_id, pvt.hr, pat.gender, adm.admittime, adm.dischtime, pat.dob, adm.ethnicity, adm.admission_type,
 adm.hospital_expire_flag, ie.intime, ie.outtime, adm.subject_id, ie.hadm_id
-order by pvt.subject_id, pvt.hadm_id, pvt.icustay_id, pvt.hr;
+order by pvt.icustay_id, pvt.hr, pvt.subject_id, pvt.hadm_id;
