@@ -1,4 +1,4 @@
--- This query pivots the vital signs for the first 24 hours of a patient's stay
+﻿-- This query pivots the vital signs for the first 24 hours of a patient's stay
 -- Vital signs include heart rate, blood pressure, respiration rate, and temperature
 set search_path to mimiciii;
 
@@ -74,6 +74,23 @@ WHERE iec.icustay_id = pvt.icustay_id AND itemid IN (30011, 30012) AND
 hr = ceil(extract(EPOCH from iec.charttime - ie.intime)/60.0/60.0)
 GROUP BY iec.icustay_id, hr
 ) as in_starch
+
+-- Add output
+,(SELECT sum(iec.value)
+FROM mimiciii.outputevents iec
+JOIN mimiciii.icustays ie ON iec.icustay_id = ie.icustay_id
+WHERE iec.icustay_id = pvt.icustay_id AND itemid IN (50055, 50056, 50057, 50069, 50085, 50096, 40405, 40428, 40473, 40651, 40715) AND
+hr = ceil(extract(EPOCH from iec.charttime - ie.intime)/60.0/60.0)
+GROUP BY iec.icustay_id, hr
+) as out_urine
+
+,(SELECT sum(iec.value)
+FROM mimiciii.outputevents iec
+JOIN mimiciii.icustays ie ON iec.icustay_id = ie.icustay_id
+WHERE iec.icustay_id = pvt.icustay_id AND
+hr = ceil(extract(EPOCH from iec.charttime - ie.intime)/60.0/60.0)
+GROUP BY iec.icustay_id, hr
+) as out_total
 
 
 FROM  (
