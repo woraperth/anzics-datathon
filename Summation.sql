@@ -33,7 +33,6 @@ SELECT
 , respiratory_rate
 , temperature
 , spo2
-, glucose
 
 -- Pathology
 
@@ -72,9 +71,19 @@ SELECT
 , ptt
 
 -- --- Others
-, glucose
+, mp_labs_custom.glucose as glucose
 --, bands
 
+-- Ins
+, in_saline
+, in_csl
+, in_albumin
+, in_starch
+, in_total
+
+-- Outs
+, out_urine
+, out_total
 
 -- Join from icustays
 , dense_rank() OVER (PARTITION BY co.subject_id ORDER BY adm.admittime) AS hospstay_seq,
@@ -115,7 +124,5 @@ left join inputs inp
 left join outputs outp
   on co.icustay_id = outp.icustay_id
   and co.hr = outp.hr
-group by co.subject_id, co.hadm_id, co.icustay_id, co.hr, pvt.hr, pvt.icustay_id
-, pat.gender, adm.admittime, adm.dischtime, pat.dob, adm.ethnicity
-, adm.admission_type, adm.hospital_expire_flag, ie.intime, ie.outtime
+
 order by co.subject_id, co.hadm_id, co.icustay_id, co.hr;

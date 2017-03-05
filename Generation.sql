@@ -1,6 +1,7 @@
-set search_path to mimiciii;
+set search_path to public,mimiciii;
 
-create or replace materialized view vitals as
+drop materialized view vitals;
+create materialized view vitals as
 with vitals as
 (
     select ie.subject_id, ie.hadm_id, ie.icustay_id
@@ -103,21 +104,23 @@ with vitals as
 )
 select icustay_id, hr
 -- Vitals & Haemodynamics
-, avg(case when VitalID = 1 then pvt.valuenum else null end) as heart_rate
-, avg(case when VitalID = 2 then pvt.valuenum else null end) as abp_sys
-, avg(case when VitalID = 3 then pvt.valuenum else null end) as abp_dia
-, avg(case when VitalID = 4 then pvt.valuenum else null end) as abp_mean
-, avg(case when VitalID = 5 then pvt.valuenum else null end) as cardiac_output
-, avg(case when VitalID = 6 then pvt.valuenum else null end) as cvp
-, avg(case when VitalID = 7 then pvt.valuenum else null end) as respiratory_rate
-, avg(case when VitalID = 8 then pvt.valuenum else null end) as temperature
-, avg(case when VitalID = 9 then pvt.valuenum else null end) as spo2
-, avg(case when VitalID = 10 then pvt.valuenum else null end) as glucose
+, avg(case when VitalID = 1 then valuenum else null end) as heart_rate
+, avg(case when VitalID = 2 then valuenum else null end) as abp_sys
+, avg(case when VitalID = 3 then valuenum else null end) as abp_dia
+, avg(case when VitalID = 4 then valuenum else null end) as abp_mean
+, avg(case when VitalID = 5 then valuenum else null end) as cardiac_output
+, avg(case when VitalID = 6 then valuenum else null end) as cvp
+, avg(case when VitalID = 7 then valuenum else null end) as respiratory_rate
+, avg(case when VitalID = 8 then valuenum else null end) as temperature
+, avg(case when VitalID = 9 then valuenum else null end) as spo2
+, avg(case when VitalID = 10 then valuenum else null end) as glucose
 from Vitals
+where hr >= 0 and hr < 30
 group by icustay_id, hr;
 
 set search_path to public,mimiciii;
-CREATE OR REPLACE MATERIALIZED VIEW public.mp_labs_custom AS 
+drop materialized view mp_labs_custom;
+create MATERIALIZED VIEW mp_labs_custom AS 
  WITH mp_labs_custom AS (
          SELECT ie.icustay_id,
             ceil(date_part('epoch'::text, le.charttime - ie.intime) / 60.0::double precision / 60.0::double precision)::smallint AS hr,
@@ -320,11 +323,13 @@ CREATE OR REPLACE MATERIALIZED VIEW public.mp_labs_custom AS
             ELSE NULL::double precision
         END) AS glucose
    FROM mp_labs_custom
-  GROUP BY mp_labs_custom.icustay_id, mp_labs_custom.hr
+where hr >= 0 and hr < 30
+  GROUP BY mp_labs_custom.icustay_id, mp_labs_custom.hr;
 
 
 set search_path to public,mimiciii;
-create or replace materialized view inputs as
+drop materialized view inputs;
+create materialized view inputs as
 with inputs_stg as
 (
   select ie.icustay_id
@@ -333,6 +338,7 @@ with inputs_stg as
     , case when itemid in (30021, 30159) then iec.amount else null end as in_csl
     , case when itemid in (30009, 30008) then iec.amount else null end as in_albumin
     , case when itemid in (30011, 30012) then iec.amount else null end as in_starch
+    , case when amountuom = 'ml' then iec.amount else null end as in_total
 
   from icustays ie
   inner join inputevents_cv iec
@@ -344,19 +350,37 @@ with inputs_stg as
     , sum(in_csl) as in_csl
     , sum(in_albumin) as in_albumin
     , sum(in_starch) as in_starch
+    , sum(in_total) as in_total
   FROM inputs_stg
+  where hr >= 0 and hr < 30
   group by icustay_id, hr;
 
 
 -- Add output
 set search_path to public,mimiciii;
-create or replace materialized view outputs as
+drop materialized view outputs;
+create materialized view outputs as
 with outputs_stg as
 (
   select ie.icustay_id
   , ceil(extract(EPOCH from oe.charttime - ie.intime)/60.0/60.0) as hr
-  , case when itemid in (50055, 50056, 50057, 50069, 50085, 50096, 40405, 40428, 40473, 40651, 40715) then oe.value else null end as out_urine
-  , oe.value as out_total
+  , case when itemid in (
+  		40055, -- "Urine Out Foley"
+		43175, -- "Urine ."
+		40069, -- "Urine Out Void"
+		40094, -- "Urine Out Condom Cath"
+		40715, -- "Urine Out Suprapubic"
+		40473, -- "Urine Out IleoConduit"
+		40085, -- "Urine Out Incontinent"
+		40057, -- "Urine Out Rt Nephrostomy"
+		40056, -- "Urine Out Lt Nephrostomy"
+		40405, -- "Urine Out Other"
+		40428, -- "Urine Out Straight Cath"
+		40086,--    Urine Out Incontinent
+		40096, -- "Urine Out Ureteral Stent #1"
+		40651 -- "Urine Out Ureteral Stent #2"
+  ) then oe.value else null end as out_urine
+  , case when valueuom = 'ml' then oe.value else null end as out_total
   from icustays ie
   inner join outputevents oe
     on ie.icustay_id = oe.icustay_id
@@ -365,4 +389,5 @@ with outputs_stg as
   , sum(out_urine) as out_urine
   , sum(out_total) as out_total
   from outputs_stg
+  where hr >= 0 and hr < 30
   group by icustay_id, hr;
